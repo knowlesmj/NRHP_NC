@@ -1,0 +1,189 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>NRHP Sites NC (2020)</title>
+    	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.0/dist/leaflet.css"/>
+	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.14.0/css/all.css">
+
+    <style>
+ 	html, body, #map { width: 100%; height: 100%; margin: 0; background: #fff; }
+            .legend {
+    line-height: 40px;
+    font-size: 16px;
+    width: 190px;
+    color: #333333;
+    padding: 6px 8px;
+    background: white;
+    background: rgba(255,255,255,0.5);
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    border-radius: 5px;
+    font-family: 'Titillium Web', sans-serif;
+}
+ 
+.legend i {
+    width: 20px;
+    height: 20px;
+    float: left;
+    margin-right: 8px;
+    opacity: 0.9;
+}
+ 
+.legend img {
+    width: 16px;
+    height: 16px;
+    margin-right: 3px;
+    float: left;
+}
+ 
+.legend p {
+    font-size: 14px;
+    line-height: 20px;
+    margin: 0;
+}
+
+h1 {
+			position: absolute;
+			margin-top: 0;
+			top: 10px;
+			left: 45px;
+			font-size: 2em;
+			font-family: "Copperplate", fantasy;
+			letter-spacing: .04em;
+			padding: 10px 15px;
+            color: #000000;
+			background: rgb(255, 255, 255);
+			border: 1px solid rgb(0, 0, 0);
+			border-radius: 3px;
+			z-index: 800;
+		}
+    </style>
+    	<link href="https://fonts.googleapis.com/css?family=Titillium+Web" rel="stylesheet">
+	<script src="https://unpkg.com/leaflet@1.7.0/dist/leaflet.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-ajax/2.1.0/leaflet.ajax.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/1.3.4/chroma.min.js"></script>
+    
+    
+    <script src="leaflet.markercluster.layersupport-src.js">//attempting to add a markercluster feature to clean map up at lower zoom levels, ended up not working out Link: https://github.com/Leaflet/Leaflet.markercluster/tree/leaflet-0.7</script>
+
+</head>
+<body>
+<!-- Our web map and content will go here -->
+<div id="map"></div>
+
+<h1>NRHP Buildings in North Carolina by County</h1>
+
+<section>
+
+
+    
+</section>
+<script>
+ 
+ var mymap = L.map('map', {
+    center: [35.399756,-79.766613], //note that we've centered the map to downtown AVL
+    zoom: 8, //this line adjusts the starting zoom level of the map
+    maxZoom: 12,//this line sets the maximum zoom level
+    minZoom: 8,//this line sets the minimum zoom level
+    detectRetina: true // detect whether the screen is high resolution or not.
+});
+ 
+// 2. Add a base map.
+L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png').addTo(mymap);
+
+var NRHP_Points = null;
+
+var colors = chroma.scale('Dark2').mode('lch').colors(3); //3 defines the number of colors from the color block that is going to be used
+
+// 5. dynamically append style classes to this page. The style classes will be used to shade the markers.
+// We can use a for loop to do this.
+for (i = 0; i < 3; i++) {
+    $('head').append($("<style> .marker-color-" + (i + 1).toString() + " { color: " + colors[i] + "; font-size: 2px; text-shadow: 0 0 3px #ffffff;} </style>"));
+} //Adds a way for the code to understand how it will color the markers in the data. Appends the style in the header with a color until each header has a value (until the system counts to three in the loop). Could have been done manually, however it allows the styling to be automated, not making the coder define each one of the headers themselves.
+
+NRHP_Points = L.geoJson.ajax("assets/NRHP_Points.geojson",{
+ 
+ // assign a function to the onEachFeature parameter of the airbnb_listings object.
+ // Then each (point) feature will have a popup window.
+ // The content of the popup window is the value of `property_t` from the attribute table
+ onEachFeature: function (feature, layer) {
+     layer.bindPopup(feature.properties.RESNAME);
+ },
+
+ pointToLayer: function(feature, latlng) {
+    var id = 0;
+    return L.marker(latlng, {icon: L.divIcon({className: 'far fa-building marker-color' + (id + 1).toString() })});
+ },
+
+   attribution: 'National Registry of Historic Places &copy; Department of Interior | North Carolina County Map &copy; NC One Map | Base Map &copy; CartoDB | Matthew Knowles: '
+}).addTo(mymap);
+
+
+// 6. Set function for color ramp
+colors = chroma.scale('OrRd').colors(5); 
+
+//Derived From Jenks Natural Breaks method
+function setColor(density) {
+    var id = 0;
+    if (density > 65) { id = 4; } 
+    else if (density > 31 && density <= 65) { id = 3; } 
+    else if (density > 15 && density <= 31) { id = 2; } 
+    else if (density > 7 &&  density <= 15) { id = 1; } 
+    else  { id = 0; }
+    return colors[id];
+}
+// 7. Set style function
+function style(feature) {
+    return {
+        fillColor: setColor(feature.properties.Point_Coun),
+        fillOpacity: 1,
+        weight: 2,
+        opacity: 1,
+        color: '#b4b4b4',
+        dashArray: '4'
+    };
+}
+
+L.geoJson.ajax("assets/NC_Counties.geojson", {
+    style: style
+}).addTo(mymap);
+
+var legend = L.control({position: 'topright'});
+ 
+// 10. Function that runs when legend is added to map
+legend.onAdd = function () {
+ 
+    // Create Div Element and Populate it with HTML
+    var div = L.DomUtil.create('div', 'legend');
+    //this line creates a title for the choropleth part of the legend
+    div.innerHTML += '<b>NRHP Sites Per County</b><br />';
+    //notice the class breaks entered at the end of the next 5 lines
+    //the colors specify the shade of purple that we used to do the polygon shading
+    div.innerHTML += '<i style="background: ' + colors[4] + '; opacity: 0.5"></i><p>66+</p>';
+    div.innerHTML += '<i style="background: ' + colors[3] + '; opacity: 0.5"></i><p>32-65</p>';
+    div.innerHTML += '<i style="background: ' + colors[2] + '; opacity: 0.5"></i><p>16-31</p>';
+    div.innerHTML += '<i style="background: ' + colors[1] + '; opacity: 0.5"></i><p>8-15</p>';
+    div.innerHTML += '<i style="background: ' + colors[0] + '; opacity: 0.5"></i><p> 0-7</p>';
+    //this line provides the legend title for the airbnb colored symbols
+    return div;
+};
+ 
+// 11. Add a legend to map
+legend.addTo(mymap);
+
+/////////////////
+//4. Add a Scale bar
+/////////////////
+
+// 12. Add a scale bar to map
+L.control.scale({position: 'bottomleft'}).addTo(mymap);
+
+
+
+</script>
+</body>
+</html>
+
+
